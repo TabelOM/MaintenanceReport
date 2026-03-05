@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viewer - Daily Activity Maintenance OM 60 & NBM</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        :root { --primary: #000000; --accent: #3ecf8e; --bg: #f3f4f6; --border: #e5e7eb; --text: #1f2937; }
+        * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden; }
+        
+        /* Layout */
+        .app-layout { display: flex; min-height: 100vh; }
+        .app-sidebar { width: 280px; background: white; border-right: 1px solid var(--border); position: fixed; height: 100vh; z-index: 100; transition: transform 0.3s ease; }
+        .app-main { flex: 1; margin-left: 280px; padding: 20px; transition: margin-left 0.3s ease; }
+        .sidebar-hide .app-sidebar { transform: translateX(-280px); }
+        .sidebar-hide .app-main { margin-left: 0; }
+        
+        /* Nav & Elements */
+        .nav-item { display:flex; gap:15px; padding:15px; border-radius:12px; font-weight:600; cursor:pointer; margin: 0 20px 5px 20px; color: #6b7280; transition: 0.2s; }
+        .nav-item.active { background: #000; color: white; }
+        .app-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 25px; flex-wrap: wrap; }
+        .web-title { font-size: 16px; font-weight: 800; color: #000; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+        .filter-row { display: flex; align-items: center; gap: 10px; background: white; padding: 10px; border-radius: 18px; border: 1px solid var(--border); flex: 1; }
+        .search-container { display: flex; align-items: center; gap: 10px; background: #f9fafb; padding: 0 15px; border-radius: 12px; border: 1px solid var(--border); flex: 1; max-width: 250px; }
+        .search-input { width: 100%; padding: 10px 0; border: none; outline: none; font-size: 13px; background: transparent; }
+        .select-filter { padding: 10px; border-radius: 12px; border: 1px solid var(--border); font-size: 12px; font-weight: 700; outline: none; background: #f9fafb; min-width: 130px; cursor: pointer; }
+        
+        /* Tables */
+        .table-wrapper { background: white; border-radius: 20px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 15px 20px; background: #fafafa; font-size: 10px; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid var(--border); }
+        td { padding: 15px 20px; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; }
+        .group-header { background: #f9fafb; padding: 12px 20px; font-weight: 800; font-size: 12px; color: #111827; border-left: 4px solid var(--accent); display: flex; align-items: center; gap: 10px; }
+        
+        /* Buttons & Badges */
+        .btn-pdf { background: #ffffff; color: #000; border: 1.5px solid #000; padding: 11px 18px; border-radius: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .btn-round { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--border); background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .toggle-group { display: flex; gap: 5px; flex: 2; }
+        .btn-toggle { flex: 1; padding: 9px 5px; border: 1px solid var(--border); border-radius: 10px; background: #f9fafb; font-size: 10px; font-weight: 800; cursor: pointer; transition: 0.2s; white-space: nowrap; }
+        .btn-toggle.active { background: #000; color: white; border-color: #000; }
+        .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; }
+        .st-not-yet { background: #fee2e2; color: #b91c1c; }
+        .st-progress { background: #eff6ff; color: #1d4ed8; }
+        .st-done { background: #000; color: var(--accent); }
+
+        /* Login Overlay */
+        .login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: white; padding: 40px; border-radius: 24px; width: 100%; max-width: 400px; border: 1px solid var(--border); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        .login-field { margin-bottom: 20px; }
+        .login-field label { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; }
+        .login-field input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); outline: none; }
+    </style>
+</head>
+<body class="sidebar-hide">
+
+    <div id="loginSection" class="login-overlay">
+        <div class="login-card">
+            <div style="font-size: 28px; font-weight: 800; text-align: center; margin-bottom: 10px;">Refinery<span style="color:var(--accent)">.</span></div>
+            <div style="text-align: center; color: gray; font-size: 13px; margin-bottom: 30px;">Viewer Access Monitoring</div>
+            <div id="loginError" style="display:none; background:#fef2f2; color:#b91c1c; padding:12px; border-radius:10px; font-size:12px; font-weight:600; margin-bottom:20px; text-align:center;">⚠️ Username/Password Salah!</div>
+            <div class="login-field">
+                <label>Username</label>
+                <input type="text" id="loginUser" placeholder="Username">
+            </div>
+            <div class="login-field">
+                <label>Nomor Pegawai</label>
+                <input type="password" id="loginPass" placeholder="••••••••">
+            </div>
+            <button id="btnLogin" onclick="handleLogin()" class="btn-pdf" style="width:100%; background:black; color:white; justify-content:center; height:50px;">Sign In</button>
+        </div>
+    </div>
+
+    <div class="app-layout" id="mainDashboard" style="display:none;">
+        <aside class="app-sidebar">
+            <div style="padding:35px; font-size:24px; font-weight:800;">Refinery<span style="color:var(--accent)">.</span><br><small style="font-size:11px; color:gray;">VIEWER MODE</small></div>
+            <nav>
+                <div onclick="switchTab('today')" id="menuToday" class="nav-item active"><i data-lucide="calendar"></i> Maintenance Today</div>
+                <div onclick="switchTab('DONE')" id="menuDone" class="nav-item"><i data-lucide="check-circle"></i> Completed</div>
+                <div onclick="switchTab('project')" id="menuProject" class="nav-item"><i data-lucide="clipboard-list"></i> Project Monitoring</div>
+                <div onclick="handleLogout()" class="nav-item" style="margin-top:20px; color:#ef4444;"><i data-lucide="log-out"></i> Logout</div>
+            </nav>
+            <div id="pdfBtnContainer" style="position: absolute; bottom: 20px; left: 0; width: 100%; padding: 0 20px;">
+                <button onclick="generatePDF()" class="btn-pdf" style="width: 100%; justify-content: center; border-radius: 12px; height: 50px;">
+                    <i data-lucide="printer"></i> Export PDF Report
+                </button>
+            </div>
+        </aside>
+
+        <main class="app-main">
+            <header class="app-header">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <button id="sidebarToggle" class="btn-round"><i data-lucide="menu"></i></button>
+                    <div>
+                        <h2 class="web-title" id="mainTitle">Daily Activity Maintenance</h2>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                            <span id="digitalClock" style="font-size:14px; font-weight:800; color: #111827;">00:00</span>
+                            <span style="color:#d1d5db;">|</span>
+                            <span id="currentDate" style="color:gray; font-size:12px; font-weight:500;">Date</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="filter-row" id="globalFilterRow">
+                <select id="filterArea" class="select-filter" onchange="handleSearch()">
+                    <option value="">ALL AREAS</option>
+                </select>
+                <div class="search-container">
+                    <i data-lucide="search" style="width: 16px; color: #9ca3af;"></i>
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search..." onkeyup="handleSearch()">
+                </div>
+                <div class="toggle-group" id="mainFilterType">
+                    <button class="btn-toggle active" onclick="setGlobalType('ALL')">ALL TYPE</button>
+                    <button class="btn-toggle" onclick="setGlobalType('ELECTRICAL')">ELECTRICAL</button>
+                    <button class="btn-toggle" onclick="setGlobalType('INSTRUMENT')">INSTRUMENT</button>
+                    <button class="btn-toggle" onclick="setGlobalType('ROTATING')">ROTATING</button>
+                    <button class="btn-toggle" onclick="setGlobalType('STATIONARY')">STATIONARY</button>
+                </div>
+            </div>
+
+            <div id="tablesContainer" style="margin-top:20px;"></div>
+        </main>
+    </div>
+
+    <script>
+        const SB_URL = "https://omrltlrvetwhlvrljqjg.supabase.co"; 
+        const SB_KEY = "sb_publishable_gmvG8hxBmVBQAiv7dkI7GQ_Xj48S2H5";
+        const _supabase = supabase.createClient(SB_URL, SB_KEY);
+        
+        let allData = [], projectData = [], currentTab = 'today', currentGlobalType = 'ALL';
+
+        // --- AUTH LOGIC ---
+        async function checkSession() {
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (session) {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('mainDashboard').style.display = 'flex';
+                fetchData();
+            }
+        }
+
+        async function handleLogin() {
+            const user = document.getElementById('loginUser').value;
+            const pass = document.getElementById('loginPass').value;
+            const btn = document.getElementById('btnLogin');
+            const err = document.getElementById('loginError');
+
+            if(!user || !pass) return alert("Isi semua field!");
+            
+            btn.innerText = "Authenticating..."; btn.disabled = true;
+            const email = user.includes('@') ? user : `${user}@pertamina.com`;
+
+            const { error } = await _supabase.auth.signInWithPassword({ email, password: pass });
+            if (error) {
+                err.style.display = 'block'; btn.innerText = "Sign In"; btn.disabled = false;
+            } else {
+                location.reload();
+            }
+        }
+
+        async function handleLogout() {
+            await _supabase.auth.signOut();
+            location.reload();
+        }
+
+        // --- DATA & UI LOGIC ---
+        async function fetchData() {
+            const { data: logs } = await _supabase.from('maintenance_logs').select('*');
+            allData = (logs || []).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+            const { data: projects } = await _supabase.from('monitoring_proyek').select('*');
+            projectData = (projects || []).sort((a, b) => (a.no_urut || 0) - (b.no_urut || 0));
+            updateDatalists(allData);
+            handleSearch();
+        }
+
+        function renderGroupedTables(data) {
+            const container = document.getElementById('tablesContainer');
+            container.innerHTML = '';
+            
+            if (currentTab === 'project') {
+                const section = document.createElement('div');
+                section.className = 'table-wrapper';
+                section.innerHTML = `<div class="group-header"><i data-lucide="clipboard-list" style="width:16px"></i> ACTIVE PROJECTS MONITORING</div>
+                    <table><thead><tr><th>No</th><th>Kontraktor</th><th>Job Description</th><th>Area</th><th>Durasi</th><th>Progress</th><th>Next Agenda</th></tr></thead>
+                    <tbody>${projectData.map(row => `<tr><td>${row.no_urut||''}</td><td style="font-weight:700;">${row.kontraktor||''}</td><td>${row.job||''}</td><td>${row.area||''}</td><td>${row.durasi_mulai||''} - ${row.durasi_selesai||''}</td><td>${row.progress||''}</td><td>${row.next_agenda||''}</td></tr>`).join('')}</tbody></table>`;
+                container.appendChild(section);
+            } else {
+                const todayStr = new Date().toISOString().split('T')[0];
+                let filtered = (currentTab === 'today') ? data.filter(d => (d.status !== 'DONE') || (d.status === 'DONE' && d.tanggal_selesai === todayStr)) : data.filter(d => d.status === 'DONE' && d.tanggal_selesai !== todayStr);
+                
+                ['ELECTRICAL', 'INSTRUMENT', 'ROTATING', 'STATIONARY'].forEach(type => {
+                    const groupData = filtered.filter(d => d.type === type);
+                    if (groupData.length > 0) {
+                        const section = document.createElement('div');
+                        section.className = 'table-wrapper';
+                        section.innerHTML = `<div class="group-header"><i data-lucide="layers" style="width:16px"></i> ${type}</div>
+                            <table><thead><tr><th>Tgl Masuk</th><th>ESPK / Order</th><th>Activity</th><th>Area</th><th>Description</th><th>Status</th></tr></thead>
+                            <tbody>${groupData.map(row => `<tr><td>${row.tanggal}</td><td style="font-weight:700;">${row.espk||'-'}</td><td>${row.activity||'-'}</td><td>${row.area||'-'}</td><td>${row.description||'-'}</td><td><span class="status-badge ${getStatusColor(row.status)}">${row.status}</span></td></tr>`).join('')}</tbody></table>`;
+                        container.appendChild(section);
+                    }
+                });
+            }
+            lucide.createIcons();
+        }
+
+        function switchTab(t) { 
+            currentTab = t; 
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.getElementById(t==='today'?'menuToday':t==='DONE'?'menuDone':'menuProject').classList.add('active');
+            document.getElementById('globalFilterRow').style.display = (t==='project') ? 'none' : 'flex';
+            document.getElementById('mainTitle').innerText = (t==='project') ? 'Project Monitoring' : 'Daily Activity Maintenance';
+            document.getElementById('pdfBtnContainer').style.display = (t === 'today') ? 'flex' : 'none';
+            handleSearch(); 
+        }
+
+        function setGlobalType(t) { currentGlobalType = t; document.querySelectorAll('#mainFilterType .btn-toggle').forEach(btn => btn.classList.toggle('active', btn.innerText === (t==='ALL'?'ALL TYPE':t))); handleSearch(); }
+        function getStatusColor(s) { return s==='DONE'?'st-done':s==='PROGRESS'?'st-progress':'st-not-yet'; }
+        
+        function handleSearch() {
+            const q = document.getElementById('searchInput').value.toUpperCase();
+            const areaF = document.getElementById('filterArea').value;
+            const filtered = allData.filter(d => {
+                const matchSearch = q === "" || (d.tag_number || "").toUpperCase().includes(q) || (d.espk || "").toUpperCase().includes(q) || (d.activity || "").toUpperCase().includes(q);
+                const matchType = currentGlobalType === 'ALL' || d.type === currentGlobalType;
+                const matchArea = areaF === "" || d.area === areaF;
+                return matchSearch && matchType && matchArea;
+            });
+            renderGroupedTables(filtered);
+        }
+
+        function updateDatalists(data) {
+            const areas = [...new Set(data.map(item => item.area))].filter(Boolean).sort();
+            document.getElementById('filterArea').innerHTML = '<option value="">ALL AREAS</option>' + areas.map(a => `<option value="${a}">${a}</option>`).join('');
+        }
+
+        function startTime() { 
+            const n = new Date(); 
+            document.getElementById('digitalClock').innerText = n.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}); 
+            document.getElementById('currentDate').innerText = n.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long'}); 
+        }
+
+        document.getElementById('sidebarToggle').addEventListener('click', () => document.body.classList.toggle('sidebar-hide'));
+        setInterval(startTime, 1000); 
+        checkSession();
+
+        // --- PDF GENERATOR (Original Code) ---
+        async function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4'); 
+            const now = new Date();
+            const fileDate = `${String(now.getDate()).padStart(2,'0')}${String(now.getMonth()+1).padStart(2,'0')}${now.getFullYear()}`;
+            const todayStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+            const drawPageHeader = (data) => {
+                doc.setFont("helvetica", "bold").setFontSize(14).text("Daily Maintenance Report OM 60 & NBM", 14, 12);
+                doc.setFontSize(10).setFont("helvetica", "normal").text(`Laporan Tanggal: ${todayStr}`, 14, 17);
+                doc.line(14, 19, 283, 19);
+            };
+
+            const rawToday = new Date().toISOString().split('T')[0];
+            const activeData = allData.filter(d => (d.status !== 'DONE') || (d.status === 'DONE' && d.tanggal_selesai === rawToday)).sort((a,b) => a.type.localeCompare(b.type));
+            const archiveData = allData.filter(d => d.status === 'DONE' && d.tanggal_selesai !== rawToday).sort((a,b) => a.type.localeCompare(b.type));
+
+            doc.setFont("helvetica", "bold").setFontSize(11).text("A. DAFTAR PEKERJAAN AKTIF (MAINTENANCE TODAY)", 14, 28);
+            doc.autoTable({
+                startY: 32,
+                head: [['TYPE', 'TGL MASUK', 'ESPK / ORDER', 'ACTIVITY', 'AREA', 'DESCRIPTION', 'STATUS']],
+                body: activeData.map(r => [r.type, r.tanggal, r.espk, (r.activity || "").trim(), r.area, r.description, r.status]),
+                theme: 'striped', didDrawPage: drawPageHeader,
+                styles: { fontSize: 7.5, cellPadding: 2, valign: 'middle', overflow: 'linebreak' },
+                headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255], halign: 'center' },
+                columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 22, halign: 'center' }, 3: { cellWidth: 60 }, 4: { halign: 'center' }, 5: { cellWidth: 85 }, 6: { cellWidth: 28, halign: 'center' } },
+                didParseCell: (data) => { if (data.section === 'body' && data.column.index === 6) data.cell.text = [""]; },
+                didDrawCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 6) {
+                        const status = data.cell.raw;
+                        let color = status === 'PROGRESS' ? [255, 204, 0] : status === 'DONE' ? [62, 207, 142] : [255, 77, 77];
+                        doc.setFillColor(...color); doc.circle(data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, 2.2, 'F');
+                    }
+                }
+            });
+
+            doc.addPage();
+            doc.setFont("helvetica", "bold").setFontSize(11).text("B. MONITORING PROGRESS PROYEK AKTIF", 14, 28);
+            doc.autoTable({
+                startY: 32,
+                head: [['NO', 'KONTRAKTOR', 'JOB DESCRIPTION', 'AREA', 'DURASI', 'PROGRESS', 'NEXT AGENDA']],
+                body: projectData.map(p => [p.no_urut, p.kontraktor, p.job, p.area, `${p.durasi_mulai||''} - ${p.durasi_selesai||''}`, (p.progress||"").replace(/\n/g, ', '), (p.next_agenda||"").replace(/\n/g, ', ')]),
+                theme: 'striped', didDrawPage: drawPageHeader,
+                styles: { fontSize: 7, cellPadding: 2, valign: 'top', overflow: 'linebreak' },
+                headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255], halign: 'center' },
+                columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 35, fontStyle: 'bold' }, 2: { cellWidth: 55 }, 4: { cellWidth: 35, halign: 'center' }, 5: { cellWidth: 60 }, 6: { cellWidth: 60 } }
+            });
+
+            if (archiveData.length > 0) {
+                doc.addPage();
+                doc.setFont("helvetica", "bold").setFontSize(11).text("C. DATA PEKERJAAN SELESAI (COMPLETED ARCHIVE)", 14, 28);
+                doc.autoTable({
+                    startY: 32,
+                    head: [['TYPE', 'TGL MASUK', 'ESPK / ORDER', 'ACTIVITY', 'AREA', 'DESCRIPTION', 'TGL SELESAI']],
+                    body: archiveData.map(r => [r.type, r.tanggal, r.espk, r.activity, r.area, r.description, r.tanggal_selesai]),
+                    theme: 'striped', didDrawPage: drawPageHeader,
+                    styles: { fontSize: 7.5, cellPadding: 2, valign: 'middle' },
+                    headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255], halign: 'center' },
+                    columnStyles: { 1: { halign: 'center' }, 4: { halign: 'center' }, 6: { halign: 'center' } }
+                });
+            }
+
+            const pc = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pc; i++) { doc.setPage(i); doc.setFontSize(8).text(`Halaman ${i} dari ${pc}`, 260, 202); }
+            doc.save(`Daily_Report_Viewer_${fileDate}.pdf`);
+        }
+    </script>
+</body>
+</html>
