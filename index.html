@@ -152,16 +152,30 @@
                     <canvas id="statusChart"></canvas>
                 </div>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div class="chart-wrapper">
-                    <div style="font-size: 13px; font-weight: 800; margin-bottom: 15px;">Requests by Area</div>
-                    <canvas id="areaChart"></canvas>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="chart-wrapper">
+                        <div style="font-size: 13px; font-weight: 800; margin-bottom: 15px;">Requests by Area</div>
+                        <canvas id="areaChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div style="font-size: 13px; font-weight: 800; margin-bottom: 15px;">Equipment Discipline</div>
+                        <canvas id="equipChart"></canvas>
+                    </div>
                 </div>
-                <div class="chart-wrapper">
-                    <div style="font-size: 13px; font-weight: 800; margin-bottom: 15px;">Equipment Discipline</div>
-                    <canvas id="equipChart"></canvas>
-                </div>
-            </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+        <div class="chart-wrapper">
+            <div style="font-size: 13px; font-weight: 800; margin-bottom: 15px;">Job Aging Analysis (Pending)</div>
+            <canvas id="agingChart"></canvas>
+        </div>
+        <div class="chart-wrapper" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+            <div style="font-size: 13px; font-weight: 800; margin-bottom: 15px;">Mean Time To Repair (MTTR)</div>
+            <div id="mttrValue" style="font-size: 64px; font-weight: 800; color: var(--accent);">0</div>
+            <div style="font-size: 12px; font-weight: 600; color: #9ca3af;">AVERAGE DAYS TO FINISH</div>
+        </div>
+    </div>
+
+
+
         </div>
 
         <div id="contentSection" style="display: none;">
@@ -307,17 +321,77 @@
         document.getElementById('statDoneToday').innerText = doneToday;
         document.getElementById('statTotalDone').innerText = totalDone;
 
-        // Chart 1: Traffic
         const timeline = getTimelineData(10);
-        createChart('trafficChart', 'line', {
-            labels: timeline.labels,
-            datasets: [{ label: 'Request', data: timeline.values, borderColor: '#000', backgroundColor: 'rgba(0,0,0,0.05)', fill: true, tension: 0.4 }]
-        });
+        createTrafficChart('trafficChart', timeline.labels, timeline.values);   
 
-        // Chart 2: Status
-        createChart('statusChart', 'doughnut', {
+        function createTrafficChart(id, labels, values) {
+    const ctx = document.getElementById(id).getContext('2d');
+    
+    // Membuat gradien warna (Emerald ke Transparan)
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(62, 207, 142, 0.3)');
+    gradient.addColorStop(1, 'rgba(62, 207, 142, 0)');
+
+    if (chartInstances[id]) chartInstances[id].destroy();
+    
+    chartInstances[id] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Maintenance Traffic',
+                data: values,
+                borderColor: '#3ecf8e', // Warna aksen hijau
+                borderWidth: 3,
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: '#3ecf8e',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                backgroundColor: gradient,
+                tension: 0.4 // Membuat garis melengkung halus
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false } // Sembunyikan label atas agar minimalis
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    border: { display: false },
+                    grid: { color: '#f3f4f6' },
+                    ticks: {
+                        font: { size: 10, weight: '600' },
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    border: { display: false },
+                    grid: { display: false }, // Hilangkan grid vertikal agar bersih
+                    ticks: {
+                        font: { size: 10, weight: '600' }
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+        // Chart 2: Status (Ubah 'doughnut' jadi 'pie')
+        createChart('statusChart', 'pie', {
             labels: ['Backlog', 'Progress', 'Done'],
-            datasets: [{ data: [allData.filter(d=>d.status==='NOT YET').length, allData.filter(d=>d.status==='PROGRESS').length, totalDone], backgroundColor: ['#ff4d4d', '#3498db', '#3ecf8e'] }]
+            datasets: [{ 
+                data: [
+                    allData.filter(d=>d.status==='NOT YET').length, 
+                    allData.filter(d=>d.status==='PROGRESS').length, 
+                    totalDone
+                ], 
+                backgroundColor: ['#ff4d4d', '#3498db', '#3ecf8e'] 
+            }]
         });
 
         // Chart 3: Area
@@ -333,12 +407,72 @@
             labels: typeMap.labels,
             datasets: [{ data: typeMap.values, backgroundColor: ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b'] }]
         });
+
+        // Hitung & Gambar Aging Chart
+const aging = getAgingData();
+createChart('agingChart', 'bar', {
+    labels: ['< 3 Days', '3-7 Days', '> 7 Days'],
+    datasets: [{
+        data: aging,
+        backgroundColor: ['#3ecf8e', '#3498db', '#ff4d4d'] // Hijau, Biru, Merah
+    }]
+});
+
+// Hitung MTTR (Mean Time To Repair)
+const doneJobs = allData.filter(d => d.status === 'DONE' && d.tanggal_selesai);
+if (doneJobs.length > 0) {
+    let totalDays = 0;
+    doneJobs.forEach(d => {
+        const start = new Date(d.tanggal);
+        const end = new Date(d.tanggal_selesai);
+        totalDays += Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    });
+    document.getElementById('mttrValue').innerText = (totalDays / doneJobs.length).toFixed(1);
+}
+
     }
+
+        function getAgingData() {
+            const now = new Date();
+            let fresh = 0, mid = 0, old = 0;
+
+            allData.filter(d => d.status !== 'DONE').forEach(d => {
+                const diff = Math.ceil((now - new Date(d.tanggal)) / (1000 * 60 * 60 * 24));
+                if (diff <= 3) fresh++;
+                else if (diff <= 7) mid++;
+                else old++;
+            });
+            return [fresh, mid, old];
+        }
 
     function createChart(id, type, data) {
         if (chartInstances[id]) chartInstances[id].destroy();
         chartInstances[id] = new Chart(document.getElementById(id), {
-            type, data, options: { maintainAspectRatio: false, plugins: { legend: { display: type==='doughnut'||type==='polarArea' } } }
+            type, 
+            data, 
+            options: { 
+                maintainAspectRatio: false, 
+                plugins: { 
+                    legend: { 
+                        display: type==='doughnut'||type==='polarArea'||type==='pie',
+                        position: 'bottom',
+                        labels: { usePointStyle: true, pointStyle: 'circle', padding: 15 }
+                    } 
+                },
+                // --- BAGIAN INI UNTUK MEMPERJELAS ANGKA DI POLAR AREA ---
+                scales: type === 'polarArea' ? {
+                    r: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0, 0, 0, 0.05)', lineWidth: 1 }, // Garis lingkaran halus
+                        ticks: {
+                            color: '#000', // Warna angka hitam pekat
+                            backdropColor: 'rgba(255, 255, 255, 0.7)', // Background putih transparan di belakang angka
+                            font: { size: 11, weight: '800' },
+                            z: 10 // Pastikan angka tampil paling depan (di atas warna)
+                        }
+                    }
+                } : {}
+            }
         });
     }
 
