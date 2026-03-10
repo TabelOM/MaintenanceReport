@@ -419,7 +419,24 @@ createChart('agingChart', 'bar', {
 });
 
 // Hitung MTTR (Mean Time To Repair)
-const doneJobs = allData.filter(d => d.status === 'DONE' && d.tanggal_selesai);
+const doneJobs = allData.filter(d => d.status === 'DONE' && d.tanggal && d.tanggal_selesai);
+const mttrElement = document.getElementById('mttrValue');
+
+if (mttrElement) {
+    if (doneJobs.length > 0) {
+        let totalDays = 0;
+        doneJobs.forEach(d => {
+            const start = new Date(d.tanggal);
+            const end = new Date(d.tanggal_selesai);
+            const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+            totalDays += Math.max(1, diff); // Minimal 1 hari
+        });
+        mttrElement.innerText = (totalDays / doneJobs.length).toFixed(1);
+    } else {
+        mttrElement.innerText = "0";
+    }
+}
+
 if (doneJobs.length > 0) {
     let totalDays = 0;
     doneJobs.forEach(d => {
@@ -557,26 +574,61 @@ if (doneJobs.length > 0) {
     }
 
     document.getElementById('mainForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const id = document.getElementById('editId').value;
-        const isProject = (currentTab === 'project');
-        const table = isProject ? 'monitoring_proyek' : 'maintenance_logs';
-        let payload = isProject ? { 
-            no_urut: document.getElementById('no_urut').value, kontraktor: document.getElementById('kontraktor').value, 
-            job: document.getElementById('job').value, area: document.getElementById('area_p').value, 
-            jenis: document.getElementById('jenis').value, durasi_mulai: document.getElementById('durasi_mulai').value, 
-            durasi_selesai: document.getElementById('durasi_selesai').value, progress: document.getElementById('progress_p').value, 
-            next_agenda: document.getElementById('next_agenda').value, keterangan: document.getElementById('keterangan').value 
-        } : { 
-            tanggal: document.getElementById('tanggal').value, type: document.getElementById('typeVal').value, 
-            tag_number: document.getElementById('tag_number').value, area: document.getElementById('area_m').value, 
-            description: document.getElementById('description').value, espk: document.getElementById('espk').value, 
-            status: document.getElementById('statusVal').value, activity: document.getElementById('activity').value, 
-            tanggal_selesai: (document.getElementById('statusVal').value === 'DONE') ? document.getElementById('tanggal_selesai').value : null 
-        };
-        const { error } = id ? await _supabase.from(table).update(payload).eq('id', id) : await _supabase.from(table).insert([payload]);
-        if (!error) { showToast("Success!"); closeModal(); fetchData(); }
-    });
+    e.preventDefault();
+    const id = document.getElementById('editId').value;
+    const isProject = (currentTab === 'project');
+    const table = isProject ? 'monitoring_proyek' : 'maintenance_logs';
+    const statusVal = document.getElementById('statusVal').value || 'NOT YET';
+    
+    // Validasi Dasar
+    if (!isProject && !document.getElementById('tanggal').value) {
+        alert("Tanggal wajib diisi!");
+        return;
+    }
+
+    let payload = isProject ? { 
+        no_urut: parseInt(document.getElementById('no_urut').value) || 0, 
+        kontraktor: document.getElementById('kontraktor').value, 
+        job: document.getElementById('job').value, 
+        area: document.getElementById('area_p').value, 
+        jenis: document.getElementById('jenis').value, 
+        durasi_mulai: document.getElementById('durasi_mulai').value || null, 
+        durasi_selesai: document.getElementById('durasi_selesai').value || null, 
+        progress: document.getElementById('progress_p').value, 
+        next_agenda: document.getElementById('next_agenda').value, 
+        keterangan: document.getElementById('keterangan').value 
+    } : { 
+        tanggal: document.getElementById('tanggal').value, 
+        type: document.getElementById('typeVal').value, 
+        tag_number: document.getElementById('tag_number').value, 
+        area: document.getElementById('area_m').value, 
+        description: document.getElementById('description').value, 
+        espk: document.getElementById('espk').value, 
+        status: statusVal, 
+        activity: document.getElementById('activity').value, 
+        tanggal_selesai: (statusVal === 'DONE') ? (document.getElementById('tanggal_selesai').value || new Date().toISOString().split('T')[0]) : null 
+    };
+
+    try {
+        const { error } = id 
+            ? await _supabase.from(table).update(payload).eq('id', id) 
+            : await _supabase.from(table).insert([payload]);
+
+        if (error) throw error;
+
+        showToast("Data Berhasil Disimpan!"); 
+        closeModal(); 
+        await fetchData(); 
+    } catch (err) {
+        console.error("Save Error:", err);
+        // Jika error 42501 muncul lagi, berarti SQL Policy di atas belum dijalankan
+        if (err.code === "42501") {
+            alert("Akses Ditolak Server (RLS): Kamu harus menjalankan perintah SQL 'DISABLE RLS' di Dashboard Supabase agar Admin bisa menyimpan data.");
+        } else {
+            alert("Gagal simpan: " + err.message);
+        }
+    }
+});
 
     async function handleDelete() {
         const id = document.getElementById('editId').value;
