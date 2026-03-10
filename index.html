@@ -129,6 +129,27 @@
         .bullet-list { margin: 0; padding-left: 18px; list-style-type: disc; }
         .bullet-list li { margin-bottom: 3px; }
 
+        /* CLICKABLE STAT CARD */
+        .stat-card.clickable { cursor: pointer; }
+        .stat-card.clickable:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); border-color: var(--accent); }
+        .stat-card .stat-hint { font-size: 9px; font-weight: 700; color: #c4c4c4; margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+
+        /* DRILL DOWN MODAL */
+        .modal-drilldown { max-width: 900px !important; }
+        .drilldown-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+        .drilldown-table th { text-align: left; padding: 9px 12px; background: #fafafa; font-size: 10px; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .drilldown-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; }
+        .drilldown-table tr:last-child td { border-bottom: none; }
+        .drilldown-table tr:hover td { background: #f9fffe; }
+
+        /* KEYWORD CLOUD */
+        .keyword-cloud { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px 0; }
+        .keyword-chip { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #f3f4f6; color: #374151; border: 1px solid var(--border); transition: 0.2s; cursor: default; white-space: nowrap; }
+        .keyword-chip.kw-1 { background: #000; color: var(--accent); border-color: #000; font-size: 13px; }
+        .keyword-chip.kw-2 { background: #1a1a1a; color: #fff; border-color: #1a1a1a; font-size: 12px; }
+        .keyword-chip.kw-3 { background: #f0fdf8; color: #065f46; border-color: #6ee7b7; font-size: 11px; }
+        .keyword-chip.kw-4 { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; font-size: 11px; }
+
         /* RESPONSIVE */
         @media (max-width: 900px) {
             .chart-grid-main { grid-template-columns: 1fr !important; }
@@ -237,21 +258,25 @@
         <!-- DASHBOARD -->
         <div id="dashboardSection" style="display:block;">
             <div class="stat-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
-                <div class="stat-card" style="border-left:4px solid #000;">
+                <div class="stat-card clickable" style="border-left:4px solid #000;" onclick="openDrillDown('total')">
                     <div class="stat-label">TOTAL DATA LOG</div>
                     <div class="stat-value" id="statTotal">—</div>
+                    <div class="stat-hint"><i data-lucide="table-2" style="width:10px;"></i> Klik untuk lihat semua data</div>
                 </div>
-                <div class="stat-card" style="border-left:4px solid #3498db;">
+                <div class="stat-card clickable" style="border-left:4px solid #3498db;" onclick="openDrillDown('today')">
                     <div class="stat-label">NEW JOBS TODAY</div>
                     <div class="stat-value" id="statNewToday">—</div>
+                    <div class="stat-hint"><i data-lucide="table-2" style="width:10px;"></i> Klik untuk lihat detail</div>
                 </div>
-                <div class="stat-card" style="border-left:4px solid var(--accent);">
+                <div class="stat-card clickable" style="border-left:4px solid var(--accent);" onclick="openDrillDown('donetoday')">
                     <div class="stat-label">FINISHED TODAY</div>
                     <div class="stat-value" id="statDoneToday">—</div>
+                    <div class="stat-hint"><i data-lucide="table-2" style="width:10px;"></i> Klik untuk lihat detail</div>
                 </div>
-                <div class="stat-card" style="border-left:4px solid #6366f1;">
+                <div class="stat-card clickable" style="border-left:4px solid #6366f1;" onclick="openDrillDown('totaldone')">
                     <div class="stat-label">TOTAL COMPLETED</div>
                     <div class="stat-value" id="statTotalDone">—</div>
+                    <div class="stat-hint"><i data-lucide="table-2" style="width:10px;"></i> Klik untuk lihat detail</div>
                 </div>
             </div>
             <div class="chart-grid" style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-bottom:16px;">
@@ -284,6 +309,19 @@
                     <div id="mttrValue" style="font-size:58px;font-weight:800;color:var(--accent);line-height:1;">—</div>
                     <div style="font-size:11px;font-weight:700;color:#9ca3af;margin-top:8px;">RATA-RATA HARI PENYELESAIAN</div>
                     <div id="mttrSample" style="font-size:10px;color:#c4c4c4;margin-top:4px;"></div>
+                </div>
+            </div>
+            <!-- NEW: Tag Number Frequency Chart -->
+            <div class="chart-grid" style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-top:16px;">
+                <div class="chart-wrapper" style="height:320px;">
+                    <div style="font-size:12px;font-weight:800;margin-bottom:10px;">Top 10 Tag Number Terbanyak</div>
+                    <canvas id="tagFreqChart"></canvas>
+                </div>
+                <!-- NEW: Keyword Cloud -->
+                <div class="chart-wrapper" style="height:320px;overflow-y:auto;">
+                    <div style="font-size:12px;font-weight:800;margin-bottom:4px;">Kata Kunci Sering Muncul (Description)</div>
+                    <div style="font-size:10px;color:#9ca3af;margin-bottom:10px;font-weight:600;">Dari seluruh field description &amp; activity</div>
+                    <div id="keywordCloud" class="keyword-cloud"></div>
                 </div>
             </div>
         </div>
@@ -399,6 +437,29 @@
         <div id="viewDetailContent"></div>
         <div style="margin-top:22px;display:flex;justify-content:flex-end;">
             <button onclick="document.getElementById('modalView').style.display='none'" class="btn-add">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DRILL DOWN -->
+<div id="modalDrillDown" class="modal-overlay" style="display:none;" onclick="onOverlayClick(event,'modalDrillDown')">
+    <div class="modal-box modal-drilldown" onclick="event.stopPropagation()">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+                <h2 id="drillDownTitle" style="font-weight:800;margin-bottom:2px;">Detail Data</h2>
+                <div id="drillDownSubtitle" style="font-size:11px;color:#9ca3af;font-weight:600;"></div>
+            </div>
+            <button onclick="document.getElementById('modalDrillDown').style.display='none'" style="border:none;background:#f3f4f6;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:700;font-size:12px;">✕ Tutup</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="drilldown-table" id="drillDownTable">
+                <thead id="drillDownHead"></thead>
+                <tbody id="drillDownBody"></tbody>
+            </table>
+        </div>
+        <div id="drillDownEmpty" style="display:none;text-align:center;padding:30px;color:#9ca3af;">
+            <div style="font-size:28px;margin-bottom:8px;">📋</div>
+            <div style="font-weight:700;font-size:13px;">Tidak ada data</div>
         </div>
     </div>
 </div>
@@ -554,8 +615,14 @@ function renderDashboard() {
 
     lucide.createIcons();
     applyUserRole();
+
+    // NEW: Tag Number Frequency Chart
+    buildTagFreqChart();
+    // NEW: Keyword Cloud
+    buildKeywordCloud();
 }
 
+// ── TRAFFIC CHART (restored) ─────────────────────────────
 function buildTrafficChart(id, labels, values) {
     var ctx = document.getElementById(id).getContext('2d');
     var grad = ctx.createLinearGradient(0,0,0,240);
@@ -575,6 +642,135 @@ function buildTrafficChart(id, labels, values) {
             }
         }
     });
+}
+
+// ── TAG FREQUENCY CHART ─────────────────────────────────
+function buildTagFreqChart() {
+    var freq = {};
+    allData.forEach(function(d){
+        if (d.tag_number && d.tag_number.trim()) {
+            var k = d.tag_number.trim().toUpperCase();
+            freq[k] = (freq[k]||0) + 1;
+        }
+    });
+    var sorted = Object.keys(freq).sort(function(a,b){ return freq[b]-freq[a]; }).slice(0,10);
+    var labels = sorted;
+    var values = sorted.map(function(k){ return freq[k]; });
+    var colors = ['#000','#1a1a1a','#3ecf8e','#3498db','#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444'];
+
+    if (chartInstances['tagFreqChart']) chartInstances['tagFreqChart'].destroy();
+    var ctx = document.getElementById('tagFreqChart').getContext('2d');
+    chartInstances['tagFreqChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets:[{ label:'Jumlah Kemunculan', data: values, backgroundColor: colors, borderRadius: 6 }] },
+        options: {
+            indexAxis: 'y',
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return ' ' + c.raw + ' kali muncul'; } } } },
+            scales: {
+                x: { beginAtZero: true, border:{ display:false }, grid:{ color:'#f3f4f6' }, ticks:{ font:{ size:10 }, stepSize:1 } },
+                y: { border:{ display:false }, grid:{ display:false }, ticks:{ font:{ size:10, weight:'700' } } }
+            }
+        }
+    });
+}
+
+// ── KEYWORD CLOUD ────────────────────────────────────────
+function buildKeywordCloud() {
+    var stopWords = new Set([
+        'yang','dan','di','ke','dari','untuk','dengan','adalah','ada','atau','tidak','ini','itu',
+        'pada','dalam','oleh','akan','telah','sudah','juga','serta','karena','agar','atas',
+        'bawah','setelah','sebelum','namun','tetapi','hingga','sehingga','seperti','sebagai',
+        'terhadap','antara','melalui','selama','dalam','no','the','and','for','of','to','in',
+        'on','at','is','it','a','an','be','was','are','were','has','have','had','do','does',
+        'did','not','with','by','from','as','but','or','if','so','all','per','unit','pcs','-','/'
+    ]);
+    var freq = {};
+    allData.forEach(function(d){
+        var text = ((d.description||'') + ' ' + (d.activity||'')).toLowerCase()
+            .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+        text.split(' ').forEach(function(w){
+            w = w.trim();
+            if (w.length >= 3 && !stopWords.has(w) && isNaN(w)) {
+                freq[w] = (freq[w]||0) + 1;
+            }
+        });
+    });
+    var sorted = Object.keys(freq).sort(function(a,b){ return freq[b]-freq[a]; }).slice(0,40);
+    var max = sorted.length > 0 ? freq[sorted[0]] : 1;
+    var cloud = document.getElementById('keywordCloud');
+    cloud.innerHTML = '';
+    sorted.forEach(function(word){
+        var count = freq[word];
+        var ratio = count / max;
+        var cls = ratio >= 0.8 ? 'kw-1' : ratio >= 0.5 ? 'kw-2' : ratio >= 0.3 ? 'kw-3' : 'kw-4';
+        var chip = document.createElement('span');
+        chip.className = 'keyword-chip ' + cls;
+        chip.title = count + ' kemunculan';
+        chip.innerText = word.toUpperCase() + ' (' + count + ')';
+        cloud.appendChild(chip);
+    });
+    if (sorted.length === 0) {
+        cloud.innerHTML = '<span style="color:#9ca3af;font-size:12px;font-weight:600;">Belum ada data deskripsi</span>';
+    }
+}
+
+// ── DRILL DOWN MODAL ─────────────────────────────────────
+function openDrillDown(type) {
+    var todayStr = new Date().toISOString().split('T')[0];
+    var data, title, subtitle;
+
+    if (type === 'total') {
+        data = allData.slice();
+        title = 'Semua Data Log';
+        subtitle = allData.length + ' total record';
+    } else if (type === 'today') {
+        data = allData.filter(function(d){ return d.tanggal === todayStr; });
+        title = 'New Jobs Hari Ini';
+        subtitle = 'Tanggal: ' + todayStr + ' (' + data.length + ' data)';
+    } else if (type === 'donetoday') {
+        data = allData.filter(function(d){ return d.status === 'DONE' && d.tanggal_selesai === todayStr; });
+        title = 'Pekerjaan Selesai Hari Ini';
+        subtitle = 'Tanggal selesai: ' + todayStr + ' (' + data.length + ' data)';
+    } else if (type === 'totaldone') {
+        data = allData.filter(function(d){ return d.status === 'DONE'; });
+        title = 'Total Pekerjaan Selesai';
+        subtitle = data.length + ' pekerjaan telah diselesaikan';
+    }
+
+    document.getElementById('drillDownTitle').innerText = title;
+    document.getElementById('drillDownSubtitle').innerText = subtitle;
+
+    var head = document.getElementById('drillDownHead');
+    var body = document.getElementById('drillDownBody');
+    var empty = document.getElementById('drillDownEmpty');
+
+    head.innerHTML = '<tr><th>Tgl Masuk</th><th>ESPK</th><th>Type</th><th>Tag Number</th><th>Area</th><th>Activity</th><th>Description</th><th>Status</th>' + (type==='totaldone'||type==='donetoday'?'<th>Tgl Selesai</th>':'') + '</tr>';
+
+    if (data.length === 0) {
+        body.innerHTML = '';
+        document.getElementById('drillDownTable').style.display = 'none';
+        empty.style.display = 'block';
+    } else {
+        document.getElementById('drillDownTable').style.display = 'table';
+        empty.style.display = 'none';
+        body.innerHTML = data.map(function(row){
+            var extra = (type==='totaldone'||type==='donetoday') ? '<td>' + (row.tanggal_selesai||'-') + '</td>' : '';
+            return '<tr>' +
+                '<td>' + (row.tanggal||'-') + '</td>' +
+                '<td style="font-weight:700;">' + escHtml(row.espk||'-') + '</td>' +
+                '<td><span style="font-size:10px;font-weight:800;padding:3px 7px;border-radius:5px;background:#f3f4f6;">' + escHtml(row.type||'-') + '</span></td>' +
+                '<td style="font-weight:800;">' + escHtml(row.tag_number||'-') + '</td>' +
+                '<td>' + escHtml(row.area||'-') + '</td>' +
+                '<td>' + escHtml(row.activity||'-') + '</td>' +
+                '<td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + escHtml(row.description||'') + '">' + escHtml(row.description||'-') + '</td>' +
+                '<td><span class="status-badge ' + getStatusColor(row.status) + '">' + (row.status||'-') + '</span></td>' +
+                extra + '</tr>';
+        }).join('');
+    }
+
+    document.getElementById('modalDrillDown').style.display = 'flex';
+    lucide.createIcons();
 }
 
 function buildChart(id, type, data) {
